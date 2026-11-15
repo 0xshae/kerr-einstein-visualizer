@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ControlsPanel, type HighlightedSymbol } from './components/ControlsPanel';
 import { EquationsPanel } from './components/EquationsPanel';
-import { PRESETS, PresetsBar, type PresetDefinition } from './components/PresetsBar';
+import { PresetsBar, type PresetDefinition } from './components/PresetsBar';
 import { SingularityPanel } from './components/SingularityPanel';
 import { createDefaultParams, deriveQuantities } from './physics/kerr';
 import type { SimulationParams } from './physics/types';

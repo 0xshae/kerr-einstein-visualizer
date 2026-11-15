@@ -245,7 +245,6 @@ export function computeKerrShadowOutline(
   for (let i = 0; i <= samples; i++) {
     const t = i / samples;
     const r0 = rPhPro + (rPhRetro - rPhPro) * t;
-    const delta = r0 * r0 - 2 * r0 + a * a;
     const denom = a * (r0 - 1);
     if (Math.abs(denom) < 1e-9) continue;
 

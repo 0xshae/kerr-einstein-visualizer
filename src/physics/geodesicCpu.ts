@@ -138,11 +138,11 @@ export function traceRayCpu(
   const aDrag = a * kappa;
   const n = config.potentialExponent ?? 1.0;
   const q = config.chargeLikeQ ?? 0.0;
-  const maxSteps = config.maxSteps ?? 1200;
+  const maxSteps = config.maxSteps ?? 2000;
   const rEscape = config.rEscape ?? Math.max(config.rObs * 2.5, 60);
 
   const { rPlus } = solveHorizons(a, n, q);
-  const rCapture = rPlus !== null ? rPlus * 1.02 : 0.12;
+  const rCapture = rPlus !== null ? rPlus * 1.015 : 0.12;
 
   const { E, Lz, pr: initPr, pTheta: initPTheta } = zamoRayToMomenta(
     config.rObs,
@@ -172,7 +172,9 @@ export function traceRayCpu(
     }
 
     const prevThetaSide = theta - Math.PI / 2;
-    const h = 0.012 * Math.max(0.15, Math.min(3.5, (r - (rPlus ?? 0.1)) * 0.28));
+    const delta = Math.abs(kerrDelta(r, a, n, q));
+    const rScale = r * r + a * a + 1;
+    const h = 0.025 * Math.max(0.015, Math.min(1.0, delta / rScale)) / Math.max(1.0, r);
 
     const k1 = derivatives(r, theta, pr, pTheta, E, Lz, a, aDrag, n, q);
     const k2 = derivatives(

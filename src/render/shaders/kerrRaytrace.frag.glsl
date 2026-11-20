@@ -216,7 +216,9 @@ vec4 shadeDiskHit(float rHit, float phiHit, float E, float Lz) {
       float uT = inversesqrt(normSq);
       float denom = (E - omega * Lz) * uT;
       if (denom > 0.05) {
-        g = clamp(E / denom, 0.1, 3.0);
+        // Rays are normalized so the camera (ZAMO) measures photon energy 1,
+        // so g = 1 / (-p . u_emit). This includes the observer's own blueshift up close.
+        g = clamp(1.0 / denom, 0.1, 4.0);
       }
     }
   }

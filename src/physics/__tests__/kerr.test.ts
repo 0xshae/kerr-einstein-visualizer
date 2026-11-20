@@ -97,4 +97,12 @@ describe('Custom non-vacuum metric sandbox', () => {
     expect(derived.rPlusM).toBeCloseTo(1 + Math.sqrt(0.59), 5);
     expect(kerrDelta(derived.rPlusM!, 0.5, 1.0, 0.4)).toBeCloseTo(0, 6);
   });
+
+  it('keeps the shadow bounded when a_drag exceeds 1', () => {
+    const shadow = computeKerrShadowOutline(0.998 * 1.35, Math.PI / 2);
+    const width = shadow.alphaMax - shadow.alphaMin;
+    expect(Number.isFinite(width)).toBe(true);
+    expect(width).toBeGreaterThan(5);
+    expect(width).toBeLessThan(12);
+  });
 });

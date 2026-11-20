@@ -208,7 +208,7 @@ export function kretschmannDimless(r: number, thetaRad: number, a: number): numb
  * Parameterized by spherical photon orbit radius r_0 in [r_ph+, r_ph-].
  */
 export function computeKerrShadowOutline(
-  a: number,
+  aRaw: number,
   inclinationRad: number,
   samples = 140
 ): {
@@ -217,6 +217,8 @@ export function computeKerrShadowOutline(
   alphaMax: number;
   betaMax: number;
 } {
+  // Bardeen's formulas only hold for |a| < 1; custom drag can push a_drag past that.
+  const a = Math.min(Math.max(aRaw, 0), 0.999);
   const sinInc = Math.max(1e-4, Math.sin(inclinationRad));
   const cosInc = Math.cos(inclinationRad);
 

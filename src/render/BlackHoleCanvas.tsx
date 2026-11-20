@@ -104,10 +104,10 @@ export const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
 
   const regimeBadge =
     derived.regime === 'schwarzschild'
-      ? { label: 'Schwarzschild Limit (a* = 0) · R_μν = 0', tone: 'badge-exact' }
+      ? { label: 'Schwarzschild · exact vacuum', tone: 'badge-exact' }
       : derived.regime === 'kerr'
-        ? { label: `Kerr Vacuum (a* = ${derived.a.toFixed(3)}) · R_μν = 0`, tone: 'badge-exact' }
-        : { label: 'Custom Metric Sandbox · R_μν ≠ 0 (Non-Vacuum)', tone: 'badge-custom' };
+        ? { label: `Kerr a* = ${derived.a.toFixed(3)} · exact vacuum`, tone: 'badge-exact' }
+        : { label: 'Custom metric · non-vacuum', tone: 'badge-custom' };
 
   return (
     <div ref={containerRef} className="canvas-stage">
@@ -128,14 +128,16 @@ export const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
         />
       )}
 
+      <div className="canvas-vignette" />
+
       <div className="canvas-hud-top">
         <span className={`regime-badge ${regimeBadge.tone}`}>{regimeBadge.label}</span>
         {!params.effects.curvedSpacetime && (
-          <span className="regime-badge badge-flat">Flat Spacetime Comparison (No Lensing)</span>
+          <span className="regime-badge badge-flat">Flat space · no lensing</span>
         )}
       </div>
 
-      <div className="canvas-hud-bottom">
+      <div className="canvas-hud-bottom glass">
         <div className="hud-stat">
           <span>Horizon r₊</span>
           <strong>{derived.rPlusM !== null ? `${derived.rPlusM.toFixed(3)} M` : 'Naked (None)'}</strong>

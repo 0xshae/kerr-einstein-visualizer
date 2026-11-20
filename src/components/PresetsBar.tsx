@@ -13,12 +13,12 @@ export const PRESETS: PresetDefinition[] = [
   {
     id: 'schwarzschild-1916',
     label: '1916 Schwarzschild',
-    subtitle: 'a* = 0 · R_μν = 0',
+    subtitle: 'Non-spinning',
     apply: (current) => ({
       ...current,
       massSolar: 10,
       spin: 0,
-      observerDistanceKm: massSolarToRgKm(10) * 18,
+      observerDistanceKm: massSolarToRgKm(10) * 34,
       inclinationDeg: 78,
       lockDiskToIsco: true,
       diskOuterM: 16,
@@ -36,12 +36,12 @@ export const PRESETS: PresetDefinition[] = [
   {
     id: 'moderate-kerr',
     label: 'Moderate Kerr',
-    subtitle: 'a* = 0.70 · Frame Dragging',
+    subtitle: 'Spinning',
     apply: (current) => ({
       ...current,
       massSolar: 10,
       spin: 0.7,
-      observerDistanceKm: massSolarToRgKm(10) * 16,
+      observerDistanceKm: massSolarToRgKm(10) * 32,
       inclinationDeg: 80,
       lockDiskToIsco: true,
       diskOuterM: 16,
@@ -53,12 +53,12 @@ export const PRESETS: PresetDefinition[] = [
   {
     id: 'extremal-kerr',
     label: 'Extremal Kerr',
-    subtitle: 'a* = 0.998 · D-Shadow',
+    subtitle: 'Near-max spin',
     apply: (current) => ({
       ...current,
       massSolar: 10,
       spin: 0.998,
-      observerDistanceKm: massSolarToRgKm(10) * 15,
+      observerDistanceKm: massSolarToRgKm(10) * 30,
       inclinationDeg: 85,
       lockDiskToIsco: true,
       diskOuterM: 15,
@@ -70,7 +70,7 @@ export const PRESETS: PresetDefinition[] = [
   {
     id: 'custom-metric',
     label: 'Custom Metric',
-    subtitle: 'R_μν ≠ 0 Sandbox',
+    subtitle: 'Modified gravity',
     apply: (current) => ({
       ...current,
       spin: Math.max(current.spin, 0.75),

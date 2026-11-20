@@ -40,29 +40,28 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
   return (
     <aside className="controls-panel">
       <div className="panel-header">
-        <h2>Spacetime Controls</h2>
+        <h2>Controls</h2>
         <div className="mode-switch" role="tablist" aria-label="Metric Mode">
           <button
             type="button"
             className={params.metricMode === 'kerr' ? 'is-active' : ''}
             onClick={() => onChange({ ...params, metricMode: 'kerr' })}
           >
-            Exact Kerr / Schwarzschild
+            Exact
           </button>
           <button
             type="button"
             className={params.metricMode === 'custom' ? 'is-active is-custom' : ''}
             onClick={() => onChange({ ...params, metricMode: 'custom' })}
           >
-            Custom Metric
+            Custom
           </button>
         </div>
       </div>
 
       {params.metricMode === 'custom' && (
         <div className="custom-warning">
-          <strong>Non-Vacuum Sandbox (R_μν ≠ 0):</strong> Modifying metric exponents or drag coupling
-          departs from Einstein&apos;s exact vacuum solution.
+          Custom metrics aren&apos;t exact solutions of Einstein&apos;s equations. See Theory for details.
         </div>
       )}
 
@@ -73,8 +72,8 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
           onMouseLeave={() => onHighlightSymbol(null)}
         >
           <div className="control-label">
-            <span>Mass M</span>
-            <strong>{params.massSolar.toFixed(1)} M☉ (r_g = {derived.rgKm.toFixed(1)} km)</strong>
+            <span>Mass</span>
+            <strong>{params.massSolar.toFixed(1)} M☉</strong>
           </div>
           <input
             type="range"
@@ -92,9 +91,6 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
               });
             }}
           />
-          <span className="control-note">
-            Camera stays fixed in km so changing M rescales the shadow against stars.
-          </span>
         </label>
 
         <label
@@ -103,9 +99,9 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
           onMouseLeave={() => onHighlightSymbol(null)}
         >
           <div className="control-label">
-            <span>Dimensionless Spin a*</span>
+            <span>Spin</span>
             <strong>
-              {params.spin.toFixed(3)} {params.spin < 1e-4 ? '(Schwarzschild)' : ''}
+              {params.spin.toFixed(3)}
             </strong>
           </div>
           <input
@@ -124,9 +120,9 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
           onMouseLeave={() => onHighlightSymbol(null)}
         >
           <div className="control-label">
-            <span>Observer Distance r_obs</span>
+            <span>Distance</span>
             <strong>
-              {params.observerDistanceKm.toFixed(0)} km ({derived.observerRM.toFixed(1)} M)
+              {params.observerDistanceKm.toFixed(0)} km
             </strong>
           </div>
           <input
@@ -141,10 +137,10 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
             type="button"
             className="mini-action"
             onClick={() =>
-              onChange({ ...params, observerDistanceKm: massSolarToRgKm(params.massSolar) * 18 })
+              onChange({ ...params, observerDistanceKm: massSolarToRgKm(params.massSolar) * 34 })
             }
           >
-            Snap camera to 18 r_g
+            Reset distance
           </button>
         </label>
 
@@ -154,7 +150,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
           onMouseLeave={() => onHighlightSymbol(null)}
         >
           <div className="control-label">
-            <span>Inclination θ_obs</span>
+            <span>Viewing angle</span>
             <strong>{params.inclinationDeg.toFixed(0)}°</strong>
           </div>
           <input
@@ -169,14 +165,14 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
       </div>
 
       <div className="control-group">
-        <h3>Accretion Disk</h3>
+        <h3>Disk</h3>
         <label className="toggle-row">
           <input
             type="checkbox"
             checked={params.effects.showAccretionDisk}
             onChange={(e) => updateEffects('showAccretionDisk', e.target.checked)}
           />
-          <span>Show Equatorial Disk</span>
+          <span>Show disk</span>
         </label>
         <label className="toggle-row">
           <input
@@ -184,12 +180,12 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
             checked={params.lockDiskToIsco}
             onChange={(e) => onChange({ ...params, lockDiskToIsco: e.target.checked })}
           />
-          <span>Lock Inner Edge to ISCO ({derived.rIscoProgradeM.toFixed(2)} M)</span>
+          <span>Inner edge at ISCO</span>
         </label>
         {!params.lockDiskToIsco && (
           <label className="control-row">
             <div className="control-label">
-              <span>Inner Radius</span>
+              <span>Inner radius</span>
               <strong>{params.diskInnerM.toFixed(2)} M</strong>
             </div>
             <input
@@ -204,7 +200,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
         )}
         <label className="control-row">
           <div className="control-label">
-            <span>Outer Radius</span>
+            <span>Outer radius</span>
             <strong>{params.diskOuterM.toFixed(1)} M</strong>
           </div>
           <input
@@ -219,14 +215,14 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
       </div>
 
       <div className="control-group">
-        <h3>Relativistic Optics</h3>
+        <h3>Effects</h3>
         <label className="toggle-row">
           <input
             type="checkbox"
             checked={params.effects.curvedSpacetime}
             onChange={(e) => updateEffects('curvedSpacetime', e.target.checked)}
           />
-          <span>Curved Geodesics (uncheck for flat space)</span>
+          <span>Light bending</span>
         </label>
         <label className="toggle-row">
           <input
@@ -234,7 +230,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
             checked={params.effects.dopplerBeaming}
             onChange={(e) => updateEffects('dopplerBeaming', e.target.checked)}
           />
-          <span>Doppler Beaming (I ∝ g³)</span>
+          <span>Doppler beaming</span>
         </label>
         <label className="toggle-row">
           <input
@@ -242,7 +238,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
             checked={params.effects.gravitationalRedshift}
             onChange={(e) => updateEffects('gravitationalRedshift', e.target.checked)}
           />
-          <span>Gravitational + Doppler Color Shift</span>
+          <span>Redshift colors</span>
         </label>
         <label className="toggle-row">
           <input
@@ -250,20 +246,20 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
             checked={params.effects.showPhotonRing}
             onChange={(e) => updateEffects('showPhotonRing', e.target.checked)}
           />
-          <span>Highlight Multi-Orbit Photon Ring</span>
+          <span>Photon ring glow</span>
         </label>
       </div>
 
       {params.metricMode === 'custom' && (
         <div className="control-group custom-sandbox-box">
-          <h3>Custom Metric Parameters</h3>
+          <h3>Custom metric</h3>
           <label
             className={`control-row ${highlightedSymbol === 'n' ? 'is-highlighted' : ''}`}
             onMouseEnter={() => onHighlightSymbol('n')}
             onMouseLeave={() => onHighlightSymbol(null)}
           >
             <div className="control-label">
-              <span>Radial Exponent n (exact = 1.00)</span>
+              <span>Gravity falloff n</span>
               <strong>{params.customMetric.potentialExponent.toFixed(2)}</strong>
             </div>
             <input
@@ -281,7 +277,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
             onMouseLeave={() => onHighlightSymbol(null)}
           >
             <div className="control-label">
-              <span>Frame-Drag Multiplier κ (exact = 1.00)</span>
+              <span>Frame drag κ</span>
               <strong>{params.customMetric.frameDragFactor.toFixed(2)}×</strong>
             </div>
             <input
@@ -299,7 +295,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
             onMouseLeave={() => onHighlightSymbol(null)}
           >
             <div className="control-label">
-              <span>Charge-Like Term q (exact = 0.00)</span>
+              <span>Charge q</span>
               <strong>{params.customMetric.chargeLikeQ.toFixed(2)}</strong>
             </div>
             <input

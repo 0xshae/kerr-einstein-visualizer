@@ -81,31 +81,56 @@ float hash31(vec3 p) {
 }
 
 vec3 blackbodyColor(float tempNorm) {
-  // Smooth physically inspired blackbody ramp from deep red -> amber -> warm white -> blue-white
+  // Cinematic blackbody ramp: ember crimson -> blazing orange -> gold -> white-hot -> blue-white
   float t = clamp(tempNorm, 0.05, 2.2);
-  vec3 cool = vec3(0.95, 0.28, 0.08);
-  vec3 warm = vec3(1.00, 0.68, 0.30);
-  vec3 hot = vec3(1.00, 0.94, 0.86);
-  vec3 blueHot = vec3(0.68, 0.85, 1.00);
+  vec3 ember = vec3(0.70, 0.04, 0.10);
+  vec3 orange = vec3(1.00, 0.32, 0.04);
+  vec3 gold = vec3(1.00, 0.70, 0.22);
+  vec3 white = vec3(1.00, 0.95, 0.86);
+  vec3 blueHot = vec3(0.55, 0.75, 1.00);
 
-  if (t < 0.55) {
-    return mix(cool, warm, smoothstep(0.08, 0.55, t));
-  } else if (t < 1.15) {
-    return mix(warm, hot, smoothstep(0.55, 1.15, t));
-  } else {
-    return mix(hot, blueHot, smoothstep(1.15, 2.0, t));
+  if (t < 0.35) {
+    return mix(ember, orange, smoothstep(0.05, 0.35, t));
+  } else if (t < 0.75) {
+    return mix(orange, gold, smoothstep(0.35, 0.75, t));
+  } else if (t < 1.2) {
+    return mix(gold, white, smoothstep(0.75, 1.2, t));
   }
+  return mix(white, blueHot, smoothstep(1.2, 2.0, t));
+}
+
+vec3 acesFilm(vec3 x) {
+  const float a = 2.51;
+  const float b = 0.03;
+  const float c = 2.43;
+  const float d = 0.59;
+  const float e = 0.14;
+  return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
+vec3 finishColor(vec3 hdr, vec2 fragCoord) {
+  vec3 mapped = acesFilm(hdr * 0.6);
+  // Saturation boost for drama
+  float luma = dot(mapped, vec3(0.2126, 0.7152, 0.0722));
+  mapped = mix(vec3(luma), mapped, 1.3);
+  mapped = pow(max(mapped, vec3(0.0)), vec3(1.0 / 2.2));
+  // Faint display-space grain to kill banding in the dark sky
+  float grain = hash31(vec3(fragCoord, floor(uTime * 24.0))) - 0.5;
+  return mapped + grain * 0.008;
 }
 
 vec3 sampleStarfield(vec3 dir) {
   vec3 d = normalize(dir);
-  vec3 col = vec3(0.008, 0.011, 0.020);
+  vec3 col = vec3(0.004, 0.004, 0.012);
 
-  // Subtle galactic plane glow inclined relative to the BH equator
+  // Galactic band inclined relative to the BH equator, with violet/teal nebula tint
   float bandCoord = dot(d, normalize(vec3(0.24, 0.38, 0.89)));
-  float galactic = exp(-bandCoord * bandCoord * 16.0);
+  float galactic = exp(-bandCoord * bandCoord * 14.0);
   float dust = sin(d.x * 9.0 + d.y * 7.0) * cos(d.z * 11.0 - d.x * 5.0);
-  col += vec3(0.045, 0.055, 0.095) * galactic * (0.75 + 0.25 * dust);
+  float swirl = 0.5 + 0.5 * sin(d.x * 4.0 - d.z * 3.0 + dust * 1.5);
+  vec3 nebula = mix(vec3(0.10, 0.03, 0.16), vec3(0.02, 0.07, 0.14), swirl);
+  col += nebula * galactic * (0.7 + 0.3 * dust);
+  col += vec3(0.05, 0.04, 0.07) * pow(galactic, 4.0);
 
   // Two layers of crisp point stars
   for (int layer = 0; layer < 2; layer++) {
@@ -133,7 +158,7 @@ vec3 sampleStarfield(vec3 dir) {
 
 vec4 shadeDiskHit(float rHit, float phiHit, float E, float Lz) {
   float radialNorm = clamp((rHit - uDiskInner) / max(0.5, uDiskOuter - uDiskInner), 0.0, 1.0);
-  float innerFade = smoothstep(uDiskInner, uDiskInner + 0.35, rHit);
+  float innerFade = smoothstep(uDiskInner, uDiskInner + 1.1, rHit);
   float outerFade = 1.0 - smoothstep(uDiskOuter - 2.5, uDiskOuter, rHit);
 
   // Differential Keplerian shear spiral texture
@@ -164,7 +189,8 @@ vec4 shadeDiskHit(float rHit, float phiHit, float E, float Lz) {
   vec3 color = blackbodyColor(effectiveTemp * 1.15);
 
   float beaming = uEnableDoppler > 0.5 ? pow(g, 3.0) : 1.0;
-  float emission = density * (0.45 + 1.4 * tempProfile) * clamp(beaming, 0.08, 4.5);
+  // HDR emission: inner disk blazes, outer disk smoulders
+  float emission = density * (0.12 + 2.4 * pow(tempProfile, 2.5)) * clamp(beaming, 0.05, 6.0);
 
   return vec4(color * emission, clamp(density * 0.92, 0.0, 0.96));
 }
@@ -182,7 +208,8 @@ void main() {
   vec3 rayLocal = normalize(vec3(-1.0, -screen.y, screen.x));
   float nR = rayLocal.x;
   float nTheta = rayLocal.y;
-  float nPhi = rayLocal.z;
+  // Keep rays off the exact spin axis (L_z = 0), where the BL pole is singular
+  float nPhi = abs(rayLocal.z) < 2e-3 ? (rayLocal.z < 0.0 ? -2e-3 : 2e-3) : rayLocal.z;
 
   // Flat-space comparison mode when curved spacetime is toggled off
   if (uEnableCurved < 0.5) {
@@ -223,12 +250,12 @@ void main() {
     float rSphere = uHasHorizon > 0.5 ? uRPlus : 0.2;
     if (dot(camPos, rayWorld) < 0.0 && bSq < rSphere * rSphere) {
       accum *= 0.2;
-      fragColor = vec4(accum, 1.0);
+      fragColor = vec4(finishColor(accum, gl_FragCoord.xy), 1.0);
       return;
     }
 
     vec3 bg = sampleStarfield(rayWorld);
-    fragColor = vec4(pow(accum + alphaRem * bg, vec3(0.85)), 1.0);
+    fragColor = vec4(finishColor(accum + alphaRem * bg, gl_FragCoord.xy), 1.0);
     return;
   }
 
@@ -262,14 +289,17 @@ void main() {
   float transmittance = 1.0;
   bool captured = false;
   int diskCrossings = 0;
+  float minR = uRObs;
 
-  const int MAX_STEPS = 420;
+  bool escaped = false;
+  const int MAX_STEPS = 800;
   for (int i = 0; i < MAX_STEPS; i++) {
     if (r <= rCapture) {
       captured = true;
       break;
     }
     if (r >= rEscape && pr > 0.0) {
+      escaped = true;
       break;
     }
 
@@ -284,6 +314,8 @@ void main() {
     if (r > 16.0) {
       h *= min(2.6, r / 16.0);
     }
+    // Shrink steps near the spin axis where L_z / sin^2(theta) terms get stiff
+    h *= clamp(abs(sin(theta)) * 5.0, 0.06, 1.0);
 
     float k1r, k1t, k1p, k1pr, k1pt;
     float k2r, k2t, k2p, k2pr, k2pt;
@@ -291,6 +323,11 @@ void main() {
     float k4r, k4t, k4p, k4pr, k4pt;
 
     computeDerivatives(r, theta, pr, pTheta, E, Lz, k1r, k1t, k1p, k1pr, k1pt);
+    // Bound the physical displacement per step so linear disk-hit interpolation stays accurate
+    // (inside the disk zone a step may move at most ~0.35 M radially and 0.04 rad in theta)
+    float maxDr = r < uDiskOuter + 4.0 ? 0.35 : max(0.35, 0.08 * r);
+    h = min(h, maxDr / max(abs(k1r), 1e-6));
+    h = min(h, 0.04 / max(abs(k1t), 1e-6));
     computeDerivatives(r + 0.5 * h * k1r, theta + 0.5 * h * k1t, pr + 0.5 * h * k1pr, pTheta + 0.5 * h * k1pt, E, Lz, k2r, k2t, k2p, k2pr, k2pt);
     computeDerivatives(r + 0.5 * h * k2r, theta + 0.5 * h * k2t, pr + 0.5 * h * k2pr, pTheta + 0.5 * h * k2pt, E, Lz, k3r, k3t, k3p, k3pr, k3pt);
     computeDerivatives(r + h * k3r, theta + h * k3t, pr + h * k3pr, pTheta + h * k3pt, E, Lz, k4r, k4t, k4p, k4pr, k4pt);
@@ -300,6 +337,7 @@ void main() {
     phi += (h / 6.0) * (k1p + 2.0 * k2p + 2.0 * k3p + k4p);
     pr += (h / 6.0) * (k1pr + 2.0 * k2pr + 2.0 * k3pr + k4pr);
     pTheta += (h / 6.0) * (k1pt + 2.0 * k2pt + 2.0 * k3pt + k4pt);
+    minR = min(minR, r);
 
     if (theta < 0.0) {
       theta = -theta;
@@ -334,9 +372,21 @@ void main() {
     }
   }
 
-  // Subtle photon-ring highlight from rays that grazed near the photon sphere (multiple crossings)
-  if (uShowPhotonRing > 0.5 && !captured && diskCrossings >= 2) {
-    accumColor += transmittance * vec3(0.95, 0.72, 0.42) * 0.22;
+  // A ray that exhausted its budget still deep in the well is effectively trapped
+  if (!captured && !escaped && r < uRObs * 0.5) {
+    captured = true;
+  }
+
+  // Photon-ring glow: rays that skimmed the photon sphere before escaping light up a halo
+  if (uShowPhotonRing > 0.5 && !captured) {
+    float rRef = max(rCapture, 1.0) * 1.5;
+    float closeness = clamp(rRef / max(minR, 1e-3), 0.0, 1.0);
+    float halo = pow(closeness, 9.0);
+    vec3 haloColor = mix(vec3(1.0, 0.35, 0.08), vec3(1.0, 0.85, 0.6), halo);
+    accumColor += haloColor * (halo * 1.6 + pow(closeness, 3.0) * 0.06);
+    if (diskCrossings >= 2) {
+      accumColor += transmittance * vec3(1.0, 0.78, 0.45) * 0.5;
+    }
   }
 
   if (!captured) {
@@ -348,8 +398,5 @@ void main() {
     accumColor += transmittance * sampleStarfield(skyDir);
   }
 
-  // Filmic tone mapping
-  vec3 mapped = accumColor / (accumColor + vec3(0.85));
-  mapped = pow(max(mapped, vec3(0.0)), vec3(1.0 / 2.15));
-  fragColor = vec4(mapped, 1.0);
+  fragColor = vec4(finishColor(accumColor, gl_FragCoord.xy), 1.0);
 }

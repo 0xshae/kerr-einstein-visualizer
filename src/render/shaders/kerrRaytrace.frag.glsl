@@ -80,23 +80,49 @@ float hash31(vec3 p) {
   return fract((p.x + p.y) * p.z);
 }
 
-vec3 blackbodyColor(float tempNorm) {
-  // Cinematic blackbody ramp: ember crimson -> blazing orange -> gold -> white-hot -> blue-white
-  float t = clamp(tempNorm, 0.05, 2.2);
-  vec3 ember = vec3(0.70, 0.04, 0.10);
-  vec3 orange = vec3(1.00, 0.32, 0.04);
-  vec3 gold = vec3(1.00, 0.70, 0.22);
-  vec3 white = vec3(1.00, 0.95, 0.86);
-  vec3 blueHot = vec3(0.55, 0.75, 1.00);
+// ---------- Noise ----------
 
-  if (t < 0.35) {
-    return mix(ember, orange, smoothstep(0.05, 0.35, t));
-  } else if (t < 0.75) {
-    return mix(orange, gold, smoothstep(0.35, 0.75, t));
-  } else if (t < 1.2) {
-    return mix(gold, white, smoothstep(0.75, 1.2, t));
+float valueNoise3(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  vec3 u = f * f * (3.0 - 2.0 * f);
+  float n000 = hash31(i);
+  float n100 = hash31(i + vec3(1.0, 0.0, 0.0));
+  float n010 = hash31(i + vec3(0.0, 1.0, 0.0));
+  float n110 = hash31(i + vec3(1.0, 1.0, 0.0));
+  float n001 = hash31(i + vec3(0.0, 0.0, 1.0));
+  float n101 = hash31(i + vec3(1.0, 0.0, 1.0));
+  float n011 = hash31(i + vec3(0.0, 1.0, 1.0));
+  float n111 = hash31(i + vec3(1.0, 1.0, 1.0));
+  return mix(
+    mix(mix(n000, n100, u.x), mix(n010, n110, u.x), u.y),
+    mix(mix(n001, n101, u.x), mix(n011, n111, u.x), u.y),
+    u.z
+  );
+}
+
+float fbm3(vec3 p) {
+  float sum = 0.0;
+  float amp = 0.5;
+  for (int i = 0; i < 5; i++) {
+    sum += amp * valueNoise3(p);
+    p = p * 2.03 + vec3(1.7, 9.2, 3.1);
+    amp *= 0.5;
   }
-  return mix(white, blueHot, smoothstep(1.2, 2.0, t));
+  return sum;
+}
+
+// ---------- Color science ----------
+
+// Blackbody chromaticity for temperature in Kelvin (fit to CIE 1964 data), returned in linear RGB
+vec3 blackbodyRGB(float kelvin) {
+  float t = clamp(kelvin, 1000.0, 40000.0) / 100.0;
+  float r = t <= 66.0 ? 1.0 : clamp(1.292936 * pow(t - 60.0, -0.1332048), 0.0, 1.0);
+  float g = t <= 66.0
+    ? clamp(0.3900816 * log(t) - 0.6318414, 0.0, 1.0)
+    : clamp(1.1298909 * pow(t - 60.0, -0.0755148), 0.0, 1.0);
+  float b = t >= 66.0 ? 1.0 : (t <= 19.0 ? 0.0 : clamp(0.5432068 * log(t - 10.0) - 1.1962541, 0.0, 1.0));
+  return pow(vec3(r, g, b), vec3(2.2));
 }
 
 vec3 acesFilm(vec3 x) {
@@ -109,66 +135,77 @@ vec3 acesFilm(vec3 x) {
 }
 
 vec3 finishColor(vec3 hdr, vec2 fragCoord) {
-  vec3 mapped = acesFilm(hdr * 0.6);
-  // Saturation boost for drama
-  float luma = dot(mapped, vec3(0.2126, 0.7152, 0.0722));
-  mapped = mix(vec3(luma), mapped, 1.3);
+  vec3 mapped = acesFilm(hdr * 0.45);
   mapped = pow(max(mapped, vec3(0.0)), vec3(1.0 / 2.2));
-  // Faint display-space grain to kill banding in the dark sky
+  // Faint display-space grain to break up banding in the dark sky
   float grain = hash31(vec3(fragCoord, floor(uTime * 24.0))) - 0.5;
-  return mapped + grain * 0.008;
+  return mapped + grain * 0.006;
 }
+
+// ---------- Sky ----------
 
 vec3 sampleStarfield(vec3 dir) {
   vec3 d = normalize(dir);
-  vec3 col = vec3(0.004, 0.004, 0.012);
+  vec3 col = vec3(0.0015, 0.0017, 0.0024);
 
-  // Galactic band inclined relative to the BH equator, with violet/teal nebula tint
+  // Faint, dusty Milky Way band tilted against the BH equator
   float bandCoord = dot(d, normalize(vec3(0.24, 0.38, 0.89)));
-  float galactic = exp(-bandCoord * bandCoord * 14.0);
-  float dust = sin(d.x * 9.0 + d.y * 7.0) * cos(d.z * 11.0 - d.x * 5.0);
-  float swirl = 0.5 + 0.5 * sin(d.x * 4.0 - d.z * 3.0 + dust * 1.5);
-  vec3 nebula = mix(vec3(0.10, 0.03, 0.16), vec3(0.02, 0.07, 0.14), swirl);
-  col += nebula * galactic * (0.7 + 0.3 * dust);
-  col += vec3(0.05, 0.04, 0.07) * pow(galactic, 4.0);
+  float galactic = exp(-bandCoord * bandCoord * 18.0);
+  float clouds = fbm3(d * 6.0);
+  float dustLanes = smoothstep(0.42, 0.62, fbm3(d * 11.0 + 4.0));
+  col += vec3(0.020, 0.019, 0.017) * galactic * clouds * (1.0 - 0.75 * dustLanes);
 
-  // Two layers of crisp point stars
-  for (int layer = 0; layer < 2; layer++) {
-    float scale = layer == 0 ? 115.0 : 210.0;
+  // Three layers of point stars with realistic stellar colors and a steep magnitude distribution
+  for (int layer = 0; layer < 3; layer++) {
+    float scale = layer == 0 ? 90.0 : (layer == 1 ? 180.0 : 340.0);
+    float threshold = layer == 0 ? 0.992 : (layer == 1 ? 0.985 : 0.975);
     vec3 grid = d * scale;
     vec3 cell = floor(grid);
     vec3 f = fract(grid) - 0.5;
     float h = hash31(cell + float(layer) * 37.0);
-    if (h > (layer == 0 ? 0.986 : 0.991)) {
+    if (h > threshold) {
       vec3 jitter = vec3(
         hash31(cell + 1.3) - 0.5,
         hash31(cell + 7.1) - 0.5,
         hash31(cell + 13.7) - 0.5
-      ) * 0.55;
+      ) * 0.5;
       float dist = length(f - jitter);
-      float intensity = smoothstep(0.24, 0.0, dist);
-      float tempMix = hash31(cell + 29.3);
-      vec3 starTint = mix(vec3(1.0, 0.82, 0.65), vec3(0.75, 0.88, 1.0), tempMix);
-      float mag = mix(0.35, 1.65, pow(hash31(cell + 53.1), 2.0));
-      col += starTint * intensity * intensity * mag;
+      float core = exp(-dist * dist * 90.0);
+      float starTemp = mix(3200.0, 11000.0, pow(hash31(cell + 29.3), 1.6));
+      float mag = pow(hash31(cell + 53.1), 6.0) * (layer == 0 ? 3.0 : 1.0) + 0.04;
+      col += blackbodyRGB(starTemp) * core * mag * (1.0 + 2.0 * galactic);
     }
   }
   return col;
 }
 
+// ---------- Accretion disk ----------
+
 vec4 shadeDiskHit(float rHit, float phiHit, float E, float Lz) {
-  float radialNorm = clamp((rHit - uDiskInner) / max(0.5, uDiskOuter - uDiskInner), 0.0, 1.0);
-  float innerFade = smoothstep(uDiskInner, uDiskInner + 1.1, rHit);
-  float outerFade = 1.0 - smoothstep(uDiskOuter - 2.5, uDiskOuter, rHit);
+  float rIn = max(uDiskInner, 1.0);
+  float x = max(rHit / rIn, 1.0);
 
-  // Differential Keplerian shear spiral texture
+  // Novikov-Thorne-like thin-disk flux F(r) ~ r^-3 (1 - sqrt(r_in / r)), peak near r = 1.36 r_in
+  float flux = pow(x, -3.0) * (1.0 - inversesqrt(x));
+  const float FLUX_PEAK = 0.05669;
+  float fluxNorm = flux / FLUX_PEAK;
+  // Local effective temperature T ~ F^(1/4)
+  float tempLocal = 6200.0 * pow(max(fluxNorm, 1e-4), 0.25);
+
+  // Keplerian angular velocity (prograde), used for both shading and redshift
   float omega = 1.0 / (pow(max(rHit, 1.05), 1.5) + uADrag);
-  float spiralPhase = phiHit - uTime * omega * 2.4 + 4.2 * log(max(rHit, 1.01));
-  float rings = 0.72 + 0.28 * sin(rHit * 5.2 + sin(spiralPhase * 2.0) * 0.8);
-  float filaments = 0.65 + 0.35 * sin(spiralPhase * 3.0 + 1.5 * cos(rHit * 2.7 - spiralPhase));
-  float density = innerFade * outerFade * rings * filaments;
 
-  // Relativistic frequency shift g = E_obs / E_emit for prograde circular Keplerian disk
+  // Turbulent plasma: azimuthally stretched, differentially rotating noise (no seam at phi = +-pi)
+  float swirlPhi = phiHit - uTime * omega * 0.9;
+  vec3 noiseP = vec3(cos(swirlPhi) * 2.4, sin(swirlPhi) * 2.4, log(rHit) * 9.0);
+  float turb = fbm3(noiseP + vec3(0.0, 0.0, uTime * 0.02));
+  float fine = valueNoise3(noiseP * vec3(1.0, 1.0, 3.5) * 2.0);
+  float clump = 0.15 + 1.9 * pow(turb, 1.6) * (0.55 + 0.45 * fine);
+
+  float outerFade = 1.0 - smoothstep(uDiskOuter * 0.7, uDiskOuter, rHit);
+  float density = clamp(clump, 0.0, 1.6) * outerFade;
+
+  // Relativistic frequency shift g = nu_obs / nu_emit for a prograde circular Keplerian emitter
   float g = 1.0;
   if (uEnableCurved > 0.5) {
     float gtt = -(1.0 - 2.0 * pow(max(rHit, 1e-4), -uPotExp));
@@ -179,20 +216,21 @@ vec4 shadeDiskHit(float rHit, float phiHit, float E, float Lz) {
       float uT = inversesqrt(normSq);
       float denom = (E - omega * Lz) * uT;
       if (denom > 0.05) {
-        g = clamp(E / denom, 0.15, 2.6);
+        g = clamp(E / denom, 0.1, 3.0);
       }
     }
   }
 
-  float tempProfile = pow(clamp(uDiskInner / max(rHit, uDiskInner), 0.1, 1.0), 0.75);
-  float effectiveTemp = tempProfile * (uEnableRedshift > 0.5 ? g : 1.0);
-  vec3 color = blackbodyColor(effectiveTemp * 1.15);
+  // Observed color: blackbody at the Doppler/gravitationally shifted temperature
+  float tempObs = tempLocal * (uEnableRedshift > 0.5 ? g : 1.0);
+  vec3 color = blackbodyRGB(tempObs);
 
-  float beaming = uEnableDoppler > 0.5 ? pow(g, 3.0) : 1.0;
-  // HDR emission: inner disk blazes, outer disk smoulders
-  float emission = density * (0.12 + 2.4 * pow(tempProfile, 2.5)) * clamp(beaming, 0.05, 6.0);
+  // Bolometric intensity transforms as g^4 (Liouville: I_nu / nu^3 invariant)
+  float beaming = uEnableDoppler > 0.5 ? pow(g, 4.0) : 1.0;
+  float emission = 2.2 * fluxNorm * density * beaming;
 
-  return vec4(color * emission, clamp(density * 0.92, 0.0, 0.96));
+  float alpha = clamp(0.55 * density * smoothstep(0.0, 0.15, fluxNorm), 0.0, 0.9);
+  return vec4(color * emission, alpha);
 }
 
 void main() {
@@ -289,7 +327,6 @@ void main() {
   float transmittance = 1.0;
   bool captured = false;
   int diskCrossings = 0;
-  float minR = uRObs;
 
   bool escaped = false;
   const int MAX_STEPS = 800;
@@ -337,7 +374,6 @@ void main() {
     phi += (h / 6.0) * (k1p + 2.0 * k2p + 2.0 * k3p + k4p);
     pr += (h / 6.0) * (k1pr + 2.0 * k2pr + 2.0 * k3pr + k4pr);
     pTheta += (h / 6.0) * (k1pt + 2.0 * k2pt + 2.0 * k3pt + k4pt);
-    minR = min(minR, r);
 
     if (theta < 0.0) {
       theta = -theta;
@@ -361,7 +397,7 @@ void main() {
           diskCrossings++;
           vec4 diskSample = shadeDiskHit(rHit, phiHit, E, Lz);
           // Secondary/lensed photon-ring echoes stay slightly sharper
-          float orderBoost = diskCrossings > 1 ? 1.15 : 1.0;
+          float orderBoost = 1.0;
           accumColor += transmittance * diskSample.rgb * orderBoost;
           transmittance *= (1.0 - diskSample.a);
           if (transmittance < 0.02) {
@@ -377,16 +413,9 @@ void main() {
     captured = true;
   }
 
-  // Photon-ring glow: rays that skimmed the photon sphere before escaping light up a halo
-  if (uShowPhotonRing > 0.5 && !captured) {
-    float rRef = max(rCapture, 1.0) * 1.5;
-    float closeness = clamp(rRef / max(minR, 1e-3), 0.0, 1.0);
-    float halo = pow(closeness, 9.0);
-    vec3 haloColor = mix(vec3(1.0, 0.35, 0.08), vec3(1.0, 0.85, 0.6), halo);
-    accumColor += haloColor * (halo * 1.6 + pow(closeness, 3.0) * 0.06);
-    if (diskCrossings >= 2) {
-      accumColor += transmittance * vec3(1.0, 0.78, 0.45) * 0.5;
-    }
+  // Faint photon-ring sheen from rays that orbited the hole more than once
+  if (uShowPhotonRing > 0.5 && !captured && diskCrossings >= 3) {
+    accumColor *= 1.25;
   }
 
   if (!captured) {

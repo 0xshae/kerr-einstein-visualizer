@@ -91,7 +91,9 @@ export const SingularityPanel: React.FC<SingularityPanelProps> = ({ params, deri
           <p className="panel-sub">
             {isSchwarzschild
               ? 'At a* = 0, r_s = 2M is a coordinate horizon; genuine infinite curvature sits at the point r = 0.'
-              : `At a* = ${derived.a.toFixed(3)}, the singularity opens into an equatorial ring of radius a = ${derived.a.toFixed(3)} M inside r₋ and r₊.`}
+              : derived.rPlusM === null
+                ? `At a* = ${derived.a.toFixed(3)}, this metric has no horizon: the ring singularity of radius ${derived.a.toFixed(3)} M is naked.`
+                : `At a* = ${derived.a.toFixed(3)}, the singularity opens into an equatorial ring of radius a = ${derived.a.toFixed(3)} M inside r₋ and r₊.`}
           </p>
         </div>
       </div>

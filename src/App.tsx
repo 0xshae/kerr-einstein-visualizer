@@ -7,13 +7,14 @@ import { createDefaultParams, deriveQuantities } from './physics/kerr';
 import type { SimulationParams } from './physics/types';
 import { BlackHoleCanvas } from './render/BlackHoleCanvas';
 
-type WorkspaceTab = 'all' | 'equations' | 'singularity';
+type WorkspaceTab = 'visualizer' | 'theory';
 
 export const App: React.FC = () => {
   const [params, setParams] = useState<SimulationParams>(() => createDefaultParams());
   const [activePresetId, setActivePresetId] = useState<string | null>('schwarzschild-1916');
   const [highlightedSymbol, setHighlightedSymbol] = useState<HighlightedSymbol>(null);
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>('all');
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>('visualizer');
+  const [controlsOpen, setControlsOpen] = useState(true);
 
   const derived = useMemo(() => deriveQuantities(params), [params]);
 
@@ -34,71 +35,76 @@ export const App: React.FC = () => {
     setParams((prev) => ({ ...prev, ...patch }));
   };
 
+  const isVisualizer = activeTab === 'visualizer';
+
   return (
-    <div className="app-shell">
-      <header className="top-bar">
+    <div className={`app-shell ${isVisualizer ? 'is-immersive' : 'is-theory'}`}>
+      {isVisualizer && (
+        <BlackHoleCanvas params={params} derived={derived} onCameraChange={handleCameraChange} />
+      )}
+
+      <header className="top-bar glass">
         <div className="brand-block">
-          <h1>Einstein Spacetime Visualizer</h1>
-          <p>Exact Kerr &amp; Schwarzschild Vacuum Solutions · Live Geodesic Ray Tracer</p>
+          <span className="brand-mark" aria-hidden="true" />
+          <div>
+            <h1>Event Horizon</h1>
+            <p>Kerr &amp; Schwarzschild geodesic ray tracer</p>
+          </div>
         </div>
 
-        <PresetsBar activePresetId={activePresetId} onSelectPreset={handleSelectPreset} />
+        {isVisualizer && (
+          <PresetsBar activePresetId={activePresetId} onSelectPreset={handleSelectPreset} />
+        )}
 
-        <nav className="view-tabs" aria-label="Educational panels">
+        <nav className="view-tabs" aria-label="Workspace">
           <button
             type="button"
-            className={activeTab === 'all' ? 'is-active' : ''}
-            onClick={() => setActiveTab('all')}
+            className={isVisualizer ? 'is-active' : ''}
+            onClick={() => setActiveTab('visualizer')}
           >
-            All Views
+            Visualizer
           </button>
           <button
             type="button"
-            className={activeTab === 'equations' ? 'is-active' : ''}
-            onClick={() => setActiveTab('equations')}
+            className={!isVisualizer ? 'is-active' : ''}
+            onClick={() => setActiveTab('theory')}
           >
-            Equations
-          </button>
-          <button
-            type="button"
-            className={activeTab === 'singularity' ? 'is-active' : ''}
-            onClick={() => setActiveTab('singularity')}
-          >
-            Singularity &amp; Curvature
+            Theory
           </button>
         </nav>
       </header>
 
-      <main className="main-workspace">
-        <div className="left-column">
-          <BlackHoleCanvas
-            params={params}
-            derived={derived}
-            onCameraChange={handleCameraChange}
-          />
-
-          {(activeTab === 'all' || activeTab === 'equations') && (
-            <EquationsPanel
+      {isVisualizer ? (
+        <>
+          <button
+            type="button"
+            className="drawer-toggle glass"
+            onClick={() => setControlsOpen((open) => !open)}
+            aria-expanded={controlsOpen}
+          >
+            {controlsOpen ? 'Hide controls' : 'Controls'}
+          </button>
+          <div className={`controls-drawer ${controlsOpen ? 'is-open' : ''}`}>
+            <ControlsPanel
               params={params}
               derived={derived}
               highlightedSymbol={highlightedSymbol}
               onHighlightSymbol={setHighlightedSymbol}
+              onChange={handleParamChange}
             />
-          )}
-
-          {(activeTab === 'all' || activeTab === 'singularity') && (
-            <SingularityPanel params={params} derived={derived} />
-          )}
-        </div>
-
-        <ControlsPanel
-          params={params}
-          derived={derived}
-          highlightedSymbol={highlightedSymbol}
-          onHighlightSymbol={setHighlightedSymbol}
-          onChange={handleParamChange}
-        />
-      </main>
+          </div>
+        </>
+      ) : (
+        <main className="theory-workspace">
+          <EquationsPanel
+            params={params}
+            derived={derived}
+            highlightedSymbol={highlightedSymbol}
+            onHighlightSymbol={setHighlightedSymbol}
+          />
+          <SingularityPanel params={params} derived={derived} />
+        </main>
+      )}
     </div>
   );
 };

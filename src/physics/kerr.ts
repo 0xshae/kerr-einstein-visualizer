@@ -14,7 +14,7 @@ export function createDefaultParams(): SimulationParams {
   return {
     massSolar: defaultMass,
     spin: 0.0,
-    observerDistanceKm: massSolarToRgKm(defaultMass) * 18,
+    observerDistanceKm: massSolarToRgKm(defaultMass) * 34,
     inclinationDeg: 78,
     azimuthDeg: 0,
     fovDeg: 45,
